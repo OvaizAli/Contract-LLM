@@ -166,7 +166,7 @@ def main():
             return
 
         # Improved query for reviewing the contract
-        improved_query = "Review each line of the contract to identify issues and suggest corrections where necessary. Please highlight any ambiguities, errors, or areas needing clarification, and propose improvements or amendments to ensure clarity, accuracy, and compliance with legal standards."
+        improved_query = "Review each line of the contract and identify specific issues related to that contract. Provide the best possible correction for each issue too."
         
         # Handle user input with the query
         handle_userinput(improved_query, st.session_state.conversation)
