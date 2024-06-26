@@ -71,8 +71,8 @@ def get_conversation_chain(vectorstore):
     return conversation_chain
 
 # Function to handle user input and display conversation
-def handle_userinput(user_question):
-    response = st.session_state.conversation({'question': user_question})
+def handle_userinput(user_question, conversation_chain):
+    response = conversation_chain({'question': user_question})
     st.session_state.chat_history = response['chat_history']
 
     for i, message in enumerate(st.session_state.chat_history):
@@ -154,7 +154,12 @@ def main():
 
         # Default query to review each line of the contract
         default_query = "Review each line of the contract and identify specific issues related to that contract. Provide the best possible correction for each issue too."
-        handle_userinput(default_query)
+
+        # Hide initial UI elements
+        st.empty()
+
+        # Handle user input with the query
+        handle_userinput(default_query, st.session_state.conversation)
 
 if __name__ == '__main__':
     main()
