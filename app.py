@@ -153,7 +153,10 @@ def main():
             return
 
         # Default query to review each line of the contract
-        default_query = "Review each line of the contract and identify specific issues related to that contract. Provide the best possible correction for each issue too."
+        # default_query = "Review each line of the contract and identify specific issues related to that contract. Provide the best possible correction for each issue too."
+
+        default_query = "Review each line of the contract to identify issues and suggest corrections where necessary. Please highlight any ambiguities, errors, or areas needing clarification, and propose improvements or amendments to ensure clarity, accuracy, and compliance with legal standards."
+
 
         # Hide initial UI elements
         st.empty()
