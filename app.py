@@ -1,3 +1,11 @@
+
+        # default_query = "Review each line of the contract and identify specific issues related to that contract. Provide the best possible correction for each issue too."
+
+        # default_query = "Review each line of the contract to identify issues and suggest corrections where necessary. Please highlight any ambiguities, errors, or areas needing clarification, and propose improvements or amendments to ensure clarity, accuracy, and compliance with legal standards."
+
+
+
+
 import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
@@ -75,6 +83,8 @@ def handle_userinput(user_question, conversation_chain):
     response = conversation_chain({'question': user_question})
     st.session_state.chat_history = response['chat_history']
 
+    st.empty()  # Hide initial UI elements
+
     for i, message in enumerate(st.session_state.chat_history):
         if i % 2 == 0:
             st.write(user_template.replace(
@@ -89,8 +99,11 @@ def main():
     st.set_page_config(page_title="Contract Review LLM", page_icon=":brain:")
     st.write(css, unsafe_allow_html=True)
 
+    # Initialize session state
     if "initialized" not in st.session_state:
         st.session_state.initialized = True
+        st.session_state.conversation = None
+        st.session_state.chat_history = None
         
         st.session_state.contracts_folder = "./Contracts"  # Adjust this to the directory where your contracts are stored
         st.session_state.uploaded_files = os.listdir(st.session_state.contracts_folder)
@@ -152,17 +165,11 @@ def main():
             st.error("No text provided or extracted from the uploaded file.")
             return
 
-        # Default query to review each line of the contract
-        default_query = "Review each line of the contract and identify specific issues related to that contract. Provide the best possible correction for each issue too."
-
-        # default_query = "Review each line of the contract to identify issues and suggest corrections where necessary. Please highlight any ambiguities, errors, or areas needing clarification, and propose improvements or amendments to ensure clarity, accuracy, and compliance with legal standards."
-
-
-        # Hide initial UI elements
-        st.empty()
-
+        # Improved query for reviewing the contract
+        improved_query = "Review each line of the contract to identify issues and suggest corrections where necessary. Please highlight any ambiguities, errors, or areas needing clarification, and propose improvements or amendments to ensure clarity, accuracy, and compliance with legal standards."
+        
         # Handle user input with the query
-        handle_userinput(default_query, st.session_state.conversation)
+        handle_userinput(improved_query, st.session_state.conversation)
 
 if __name__ == '__main__':
     main()
