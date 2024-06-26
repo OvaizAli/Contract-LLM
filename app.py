@@ -1,11 +1,3 @@
-
-        # default_query = "Review each line of the contract and identify specific issues related to that contract. Provide the best possible correction for each issue too."
-
-        # default_query = "Review each line of the contract to identify issues and suggest corrections where necessary. Please highlight any ambiguities, errors, or areas needing clarification, and propose improvements or amendments to ensure clarity, accuracy, and compliance with legal standards."
-
-
-
-
 import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
@@ -82,8 +74,6 @@ def get_conversation_chain(vectorstore):
 def handle_userinput(user_question, conversation_chain):
     response = conversation_chain({'question': user_question})
     st.session_state.chat_history = response['chat_history']
-
-    st.empty()  # Hide initial UI elements
 
     for i, message in enumerate(st.session_state.chat_history):
         if i % 2 == 0:
@@ -166,7 +156,7 @@ def main():
             return
 
         # Improved query for reviewing the contract
-        improved_query = "Review each line of the contract and identify specific issues related to that contract. Provide the best possible correction for each issue too."
+        improved_query = "Review each line of the contract. If you identify any issues related to that line, state the issue and provide the best possible correction for each issue identified."
         
         # Handle user input with the query
         handle_userinput(improved_query, st.session_state.conversation)
