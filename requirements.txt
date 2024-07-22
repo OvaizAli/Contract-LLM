@@ -1,11 +1,13 @@
 streamlit
 python-dotenv
 PyPDF2
-pandas
 langchain
-langchain-community
 faiss-cpu
 htmltemplate
-sentence-transformers
+langchain-community
+langchain-huggingface
+streamlit-chat
 transformers
+openai
 tiktoken
+sentence-transformers
