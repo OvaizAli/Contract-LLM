@@ -3,14 +3,22 @@ from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 import pandas as pd
 import os
-
+import pickle
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.chat_models import ChatOpenAI
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from htmltemplates import css, bot_template, user_template
+from langchain_huggingface import HuggingFaceEndpoint
+
+# Load environment variables
+load_dotenv()
+
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+HUGGINGFACEHUB_API_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+CONTRACTS_DIR = "./Contracts"  # Directory containing contract documents
+EMBEDDINGS_FILE = "embeddings.pkl"
 
 # Function to extract text from PDF documents
 def get_pdf_text(pdf_docs):
@@ -52,15 +60,29 @@ def get_text_chunks(text):
 
 # Function to create a vectorstore from text chunks
 def get_vectorstore(text_chunks):
-    embeddings = OpenAIEmbeddings()
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     if not text_chunks:
         raise ValueError("No text chunks to create vectorstore.")
     vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
     return vectorstore
 
+# Function to save vectorstore embeddings
+def save_embeddings(vectorstore):
+    with open(EMBEDDINGS_FILE, "wb") as f:
+        pickle.dump(vectorstore, f)
+
+# Function to load vectorstore embeddings
+def load_embeddings():
+    if os.path.exists(EMBEDDINGS_FILE):
+        with open(EMBEDDINGS_FILE, "rb") as f:
+            return pickle.load(f)
+    return None
+
 # Function to create a conversational chain
 def get_conversation_chain(vectorstore):
-    llm = ChatOpenAI()
+    repo_id = "mistralai/Mistral-7B-Instruct-v0.3"
+    llm = HuggingFaceEndpoint(
+        repo_id=repo_id, max_length=128, temperature=0.5, token=HUGGINGFACEHUB_API_TOKEN)
     memory = ConversationBufferMemory(
         memory_key='chat_history', return_messages=True)
     conversation_chain = ConversationalRetrievalChain.from_llm(
@@ -71,11 +93,11 @@ def get_conversation_chain(vectorstore):
     return conversation_chain
 
 # Function to handle user input and display conversation
-def handle_userinput(user_question, conversation_chain):
-    response = conversation_chain({'question': user_question})
+def handle_userinput(user_question):
+    response = st.session_state.conversation({'question': user_question})
     st.session_state.chat_history = response['chat_history']
 
-    for i, message in enumerate(st.session_state.chat_history):
+    for i, message in enumerate(st.session_state.chat_history[-1:]):
         if i % 2 == 0:
             st.write(user_template.replace(
                 "{{MSG}}", message.content), unsafe_allow_html=True)
@@ -83,67 +105,67 @@ def handle_userinput(user_question, conversation_chain):
             st.write(bot_template.replace(
                 "{{MSG}}", message.content), unsafe_allow_html=True)
 
+# Function to process documents and create embeddings
+def process_documents():
+    all_text = ""
+
+    # Process all PDF files
+    pdf_files = [os.path.join(CONTRACTS_DIR, file) for file in os.listdir(CONTRACTS_DIR) if file.endswith(".pdf")]
+    if pdf_files:
+        all_text += get_pdf_text(pdf_files)
+
+    # Process all TXT files
+    txt_files = [os.path.join(CONTRACTS_DIR, file) for file in os.listdir(CONTRACTS_DIR) if file.endswith(".txt")]
+    if txt_files:
+        all_text += get_txt_text(txt_files)
+
+    # Process all CSV files
+    csv_files = [os.path.join(CONTRACTS_DIR, file) for file in os.listdir(CONTRACTS_DIR) if file.endswith(".csv")]
+    if csv_files:
+        all_text += get_csv_text(csv_files)
+
+    if not all_text:
+        st.error("No text extracted from the documents.")
+        return
+
+    # Create and save embeddings
+    text_chunks = get_text_chunks(all_text)
+    if not text_chunks:
+        st.error("No text chunks created from the extracted text.")
+        return
+
+    vectorstore = get_vectorstore(text_chunks)
+    save_embeddings(vectorstore)
+
 # Main function to run the Streamlit app
 def main():
-    load_dotenv()
     st.set_page_config(page_title="Contract Review LLM", page_icon=":brain:")
     st.write(css, unsafe_allow_html=True)
 
-    # Initialize session state
-    if "initialized" not in st.session_state:
-        st.session_state.initialized = True
+    if "conversation" not in st.session_state:
         st.session_state.conversation = None
+    if "chat_history" not in st.session_state:
         st.session_state.chat_history = None
-        
-        st.session_state.contracts_folder = "./Contracts"  # Adjust this to the directory where your contracts are stored
-        st.session_state.uploaded_files = os.listdir(st.session_state.contracts_folder)
-        st.session_state.all_text = ""
 
-        if st.session_state.uploaded_files:
-            with st.spinner("Processing Documents..."):
-                pdf_files = [os.path.join(st.session_state.contracts_folder, file) for file in st.session_state.uploaded_files if file.endswith(".pdf")]
-                if pdf_files:
-                    st.session_state.all_text += get_pdf_text(pdf_files)
+    with st.spinner("Loading or creating embeddings..."):
+        vectorstore = load_embeddings()
+        if not vectorstore:
+            st.warning("No embeddings found. Processing documents...")
+            process_documents()
+            vectorstore = load_embeddings()
 
-                txt_files = [os.path.join(st.session_state.contracts_folder, file) for file in st.session_state.uploaded_files if file.endswith(".txt")]
-                if txt_files:
-                    st.session_state.all_text += get_txt_text(txt_files)
+    if vectorstore:
+        st.session_state.conversation = get_conversation_chain(vectorstore)
+        st.success("Embeddings loaded successfully!")
 
-                csv_files = [os.path.join(st.session_state.contracts_folder, file) for file in st.session_state.uploaded_files if file.endswith(".csv")]
-                if csv_files:
-                    st.session_state.all_text += get_csv_text(csv_files)
+    st.header("Contract Review LLM (PDF, TXT, CSV) :brain:")
 
-                if not st.session_state.all_text:
-                    st.error("No text extracted from the uploaded documents.")
-                    return
-
-                # Get the text chunks
-                text_chunks = get_text_chunks(st.session_state.all_text)
-                if not text_chunks:
-                    st.error("No text chunks created from the extracted text.")
-                    return
-
-                # Create vector store
-                st.session_state.vectorstore = get_vectorstore(text_chunks)
-
-                # Create conversation chain
-                st.session_state.conversation = get_conversation_chain(st.session_state.vectorstore)
-
-    st.subheader("Paste the contract content or upload a file for review")
-
-    # Text area for pasting contract content
-    contract_text = st.text_area("Content of the contract for review:", height=300)
-
-    # File uploader for uploading contract files
-    uploaded_file = st.file_uploader("Or upload a contract file (PDF, TXT, CSV):", type=["pdf", "txt", "csv"])
+    uploaded_file = st.file_uploader("Upload a contract file (PDF, TXT, CSV):", type=["pdf", "txt", "csv"])
 
     if st.button("Review Contract"):
-        all_text = ""
-        
-        if contract_text:
-            all_text += contract_text
-        
         if uploaded_file:
+            all_text = ""
+
             if uploaded_file.type == "application/pdf":
                 all_text += get_pdf_text([uploaded_file])
             elif uploaded_file.type == "text/plain":
@@ -151,15 +173,15 @@ def main():
             elif uploaded_file.type == "text/csv":
                 all_text += get_csv_text([uploaded_file])
 
-        if not all_text:
-            st.error("No text provided or extracted from the uploaded file.")
-            return
+            if not all_text:
+                st.error("No text extracted from the uploaded file.")
+                return
 
-        # Improved query for reviewing the contract
-        improved_query = "Review each line of the contract. If you identify any issues related to that line, state the issue and provide the best possible correction for each issue identified."
-        
-        # Handle user input with the query
-        handle_userinput(improved_query, st.session_state.conversation)
+            # Improved query for reviewing the contract
+            improved_query = "As a professional contract reviewer. Review each line of the contract. If you identify any issues related to that line, state the issue and provide the best possible correction for each issue identified."
+
+            # Handle user input with the query
+            handle_userinput(improved_query)
 
 if __name__ == '__main__':
     main()
