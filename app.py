@@ -147,16 +147,16 @@ def main():
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = None
 
-    with st.spinner("Loading or creating embeddings..."):
+    with st.spinner("Gearing Up..."):
         vectorstore = load_embeddings()
         if not vectorstore:
-            st.warning("No embeddings found. Processing documents...")
+            st.warning("Error, Processing documents...")
             process_documents()
             vectorstore = load_embeddings()
 
     if vectorstore:
         st.session_state.conversation = get_conversation_chain(vectorstore)
-        st.success("Ready to Access your Contracts Now!")
+        st.success("Ready to Assess your Contracts Now!")
 
     st.header("Contract Review LLM (PDF, TXT, CSV) :brain:")
 
