@@ -156,7 +156,7 @@ def main():
 
     if vectorstore:
         st.session_state.conversation = get_conversation_chain(vectorstore)
-        st.success("Embeddings loaded successfully!")
+        st.success("Ready to Access your Contracts Now!")
 
     st.header("Contract Review LLM (PDF, TXT, CSV) :brain:")
 
